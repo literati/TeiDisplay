@@ -9,13 +9,8 @@
  * @author Ethan Gruber - ewg4x at virginia.edu
  **/
 
-if (!defined('TEI_DISPLAY_DIRECTORY')) {
-    define('TEI_DISPLAY_DIRECTORY', dirname(__FILE__));
-}
-
-if (!defined('TEI_DISPLAY_STYLESHEET_FOLDER')) {
-    define('TEI_DISPLAY_STYLESHEET_FOLDER', TEI_DISPLAY_DIRECTORY . DIRECTORY_SEPARATOR . 'libraries' . DIRECTORY_SEPARATOR);
-}
+define('TEI_DISPLAY_DIRECTORY', dirname(__FILE__));
+define('TEI_DISPLAY_STYLESHEET_FOLDER', TEI_DISPLAY_DIRECTORY . DIRECTORY_SEPARATOR . 'libraries' . DIRECTORY_SEPARATOR);
 
 add_plugin_hook('install', 'tei_display_install');
 add_plugin_hook('uninstall', 'tei_display_uninstall');
@@ -298,7 +293,8 @@ function tei_display_admin_header($request)
 
 function tei_display_public_header($request)
 {
-	echo '<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>';
+        echo "<script type=\"text/javascript\" src=\"http://ajax.googleapis.com/ajax/libs/jquery/1.7/jquery.min.js\"></script>";
+//	echo '<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>';
 	echo '<link rel="stylesheet" media="screen" href="' . WEB_PLUGIN . '/TeiDisplay/views/public/css/tei_display_public.css"/>';
 	echo js('tei_display_toggle_toc');
 }
@@ -379,17 +375,21 @@ function tei_display_installed(){
 }
 
 function render_tei_files($item_id, $section){
+    debug(sprintf("%s: begin method","render_tei_files()"));
 	$db = get_db();
 	$item = $db->getTable('Item')->find($item_id);
+        debug(sprintf("%s Looking for item with id %d; found %d items","render_tei_files()", $item_id,count($item)));
 	$hasTeiFile = array();
 	foreach ($item->Files as $file){
 		if (trim(strip_formatting(item_file('Dublin Core', 'Type', $options, $file)) == 'TEI Document')){
 			$hasTeiFile[] = 'true';
 		}
+                debug(sprintf("%s: for this item, there are/is %d TEI file","render_tei_files()", count($hasTeiFile)));
 	}
 	if (in_array('true', $hasTeiFile)){
 		$teiFiles = $db->getTable('TeiDisplay_Config')->findBySql('item_id = ?', array($item_id));
 		foreach ($teiFiles as $teiFile){
+                    debug(sprintf("%s: calling render for file, TEI_DIPLAY_CONFIG_id = ","render_tei_files()", $teiFile->id));
 			render_tei_file($teiFile->id, $section);
 		}
 	}
@@ -398,6 +398,7 @@ function render_tei_files($item_id, $section){
 function render_tei_file($identifier, $section){
 	$db = get_db();
 	$teiRecord = $db->getTable('TeiDisplay_Config')->find($identifier);
+        debug(sprintf("looking for file id %d", $identifier));
 	//initialize Dom xslt, xml documents
 	$xp = new XsltProcessor();
 	$xsl = new DomDocument;
@@ -406,6 +407,7 @@ function render_tei_file($identifier, $section){
 	if ($teiRecord->file_id != NULL){
 		$file_id = $teiRecord->file_id;
 		$teiFile = $db->getTable('File')->find($file_id)->getWebPath('archive');
+                debug(sprintf("found file with web path", $teiFile));
 	} 
 	//render TEI file from Fedora.
 	if (function_exists('fedora_connector_installed')){
@@ -431,9 +433,11 @@ function render_tei_file($identifier, $section){
 	try { 
 		if ($doc = $xp->transformToXML($xml_doc)) {			
 			echo $doc;
+                        debug("echoing successful transform");
 		}
 	} catch (Exception $e){
 		$this->view->error = $e->getMessage();
+                debug("problems transforming xml");
 	}
 }
 
