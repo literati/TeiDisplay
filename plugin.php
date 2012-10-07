@@ -58,12 +58,17 @@ function tei_display_install()
 			$teiFile = $file->getWebPath('archive');
 			$xml_doc->load($teiFile);
 			$tei2 = $xml_doc->getElementsByTagName('TEI.2');
-			foreach ($tei2 as $tei2){
-				$tei_id = $tei2->getAttribute('id');
-			}
-			if ($tei_id != NULL && $tei_id != ''){
-				$db->insert('tei_display_config', array('item_id'=>$file->item_id, 'file_id'=>$file->id, 'tei_id'=>trim($tei_id)));
-			}
+
+            if($tei2->length > 0){
+                if($tei2->item(0)->hasAttribute('id')){
+				    $tei_id = $tei2->getAttribute('id');
+                }
+			    if ($tei_id != NULL && $tei_id != ''){
+				    $db->insert('tei_display_config', array('item_id'=>$file->item_id, 'file_id'=>$file->id, 'tei_id'=>trim($tei_id)));
+			    }
+            }else{
+                //this file doesn't have the tags we're looking for
+            }
 		}
 		
 		//repopulate the tei_display_config_table with existing TEI datastreams from Fedora if FedoraConnector is installed
@@ -382,6 +387,7 @@ function render_tei_files($item_id, $section){
 	$db = get_db();
 	$item = $db->getTable('Item')->find($item_id);
 	$hasTeiFile = array();
+    $options = array();
 	foreach ($item->Files as $file){
 		if (trim(strip_formatting(item_file('Dublin Core', 'Type', $options, $file)) == 'TEI Document')){
 			$hasTeiFile[] = 'true';
@@ -426,7 +432,10 @@ function render_tei_file($identifier, $section){
 	
 	//set query parameter to pass into stylesheet
 	$xp->setParameter('', 'display', $displayType);
-	$xp->setParameter('', 'section', $section);
+    
+    if($section){
+    	$xp->setParameter('', 'section', $section);
+    }
 	
 	try { 
 		if ($doc = $xp->transformToXML($xml_doc)) {			
@@ -437,13 +446,35 @@ function render_tei_file($identifier, $section){
 	}
 }
 
+/**
+ * As its name implies, this returns the 
+ * title field of a record in our db
+ * @param int $id id of the table record we're after
+ * @retun string
+ */
 function tei_display_get_title($id){
 	$db = get_db();
 	$teiFile = $db->getTable('TeiDisplay_Config')->find($id);
-	
-	if ($teiFile->file_id != NULL){
+
+    //what if we tried the lookup using a non-existent id?
+    if(!$teiFile){
+        die("failed to get record from the db for teiDisplay_config.id = {$id}");
+    }
+
+    $options = null; //need to initialize or we fail later on
+    
+
+    if ($teiFile->file_id != NULL){
 		$file = $db->getTable('File')->find($teiFile->file_id);
-		return strip_formatting(item_file('Dublin Core', 'Title', $options, $file));
+
+        if($file){
+		    return strip_formatting(item_file('Dublin Core', 'Title', $options, $file));
+        }else{
+            die("\$file passed to item_file() was null;<br/> 
+                we based everything on the existence of a file<br/> 
+                in the tei-display table having id = {$id}"
+            );
+        }
 	}
 	if ($teiFile->fedoraconnector_id != NULL){
 		$item = $db->getTable('Item')->find($teiFile->item_id);
@@ -452,7 +483,8 @@ function tei_display_get_title($id){
 }
 
 function tei_display_local_stylesheet($id){
-	$db = get_db();
+    $db = get_db();
+
 	$teiFile = $db->getTable('TeiDisplay_Config')->find($id);
 	if ($teiFile->stylesheet != NULL && $teiFile->stylesheet != ''){
 		return TEI_DISPLAY_STYLESHEET_FOLDER . $teiFile->stylesheet;
