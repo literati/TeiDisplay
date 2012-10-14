@@ -1,3 +1,4 @@
 {
-    "name": "literati/TeiDisplay"
+    "name": "literati/TeiDisplay",
+    "type": "omeka-plugin"
 }
